@@ -1,0 +1,1 @@
+{"name":"cookie-clicker-tests","private":true,"scripts":{"test":"node test.cjs"},"devDependencies":{"playwright":"^1.56.0"}}
