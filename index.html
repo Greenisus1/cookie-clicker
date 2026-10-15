@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie Clicker with Upgrades and Achievements</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f8f1e5;color:#452819;font-family:Arial,sans-serif;min-height:100vh}main{max-width:1000px;margin:auto;padding:24px}header{display:flex;align-items:center;justify-content:space-between;gap:16px}h1{font-size:clamp(22px,4vw,32px);margin:0}h2{font-size:20px;margin:0 0 14px}button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:12px 16px;min-height:44px;background:#914018;color:white}button:hover:not(:disabled){background:#713013}button:focus-visible{outline:3px solid #24756b;outline-offset:4px}button:disabled{background:#e4d3bd;color:#715e4d;cursor:not-allowed}.layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}.panel{background:#fffaf3;padding:24px;border-radius:20px;border:1px solid #e5d3bc}.bakery{text-align:center}.eyebrow{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#78553b}.score{font-size:clamp(32px,7vw,54px);font-weight:700;margin:10px 0;overflow-wrap:anywhere}.cookie{display:block;margin:24px auto;background:none!important;padding:0;width:min(230px,100%);aspect-ratio:1;border-radius:50%;transition:transform .1s;touch-action:manipulation}.cookie:active{transform:scale(.95)}.cookie svg{width:100%;height:100%;filter:drop-shadow(0 10px 0 #e5d3bc)}.stat{color:#78553b;font-size:15px;line-height:1.7}.shop{display:grid;gap:12px}.upgrade{text-align:left;display:flex;flex-direction:column;gap:5px}.upgrade small{font-size:13px}.achievements{margin-top:24px}.achievement{padding:12px 0;border-bottom:1px solid #eadbc9}.achievement:last-child{border:0}.unlocked{color:#24756b;font-weight:700}.footer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px;font-size:13px;color:#78553b}.secondary{background:#eadbc9;color:#452819}.secondary:hover:not(:disabled){background:#d8c1a6}#message{min-height:22px;font-size:14px;color:#24756b;margin:12px 0 0}#saveStatus{max-width:70%}@media(max-width:650px){main{padding:16px}header{align-items:flex-start}.layout{grid-template-columns:1fr}.panel{padding:20px}.cookie{width:180px;margin:20px auto}header button{padding:10px}.footer{align-items:flex-start}}@media(prefers-reduced-motion:reduce){.cookie{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Cookie Clicker</h1><button id="fullscreen" class="secondary">Fullscreen</button></header>
+<div class="layout">
+<section class="panel bakery" aria-label="Bakery">
+<div class="eyebrow">Your bakery</div><div class="score"><span id="scoreValue">0</span></div><div>cookies to spend</div>
+<button id="cookie" class="cookie" aria-label="Bake cookies">
+<svg viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="100" fill="#c98137"/><circle cx="110" cy="105" r="94" fill="#eab568"/><path d="M58 54l16-5 9 15-12 12-17-7zM134 36l17 9-3 18-20-2-6-14zM158 94l18-6 11 13-6 17-19-3zM97 102l13-9 15 11-5 19-22-1zM40 126l18-6 12 14-9 16-19-6zM130 151l17-7 14 12-8 20-19-5zM75 170l15-8 13 12-6 16-15-3z" fill="#553020"/><g fill="#d49b51"><circle cx="100" cy="49" r="4"/><circle cx="52" cy="95" r="5"/><circle cx="142" cy="113" r="4"/><circle cx="87" cy="140" r="5"/><circle cx="178" cy="145" r="4"/></g></svg>
+</button>
+<div class="stat"><span id="clickValue">1</span> cookies per click<br><span id="autoClickerStatus">Auto-clicker off</span><br><span id="earnedValue">0</span> cookies baked in total</div>
+<p id="message" role="status"></p>
+</section>
+<section class="panel"><h2>Upgrades</h2><div class="shop">
+<button id="upgrade1" class="upgrade"></button><button id="upgrade2" class="upgrade"></button>
+<button id="buyAuto" class="upgrade"></button><button id="upgradeAuto" class="upgrade"></button>
+</div><div class="achievements"><h2>Achievements</h2><div id="achievement1" class="achievement"></div><div id="achievement2" class="achievement"></div><div id="achievement3" class="achievement"></div></div></section>
+</div>
+<div class="footer"><span id="saveStatus" role="status">Progress saves on this device.</span><button id="reset" class="secondary">Reset game</button></div>
+</main>
+<script>
+'use strict';
+const SAVE_KEY = 'winniegaming-cookie-clicker-v1';
+const LIMIT = 1e100;
+const number = new Intl.NumberFormat('en', {maximumFractionDigits: 1});
+const format = n => n >= 1e9 ? n.toExponential(2) : number.format(n);
+const defaults = () => ({version:1,score:0,earned:0,small:0,large:0,auto:0,achievements:[false,false,false]});
+let state=defaults(), storageAvailable=true, dirty=false;
+const el=id=>document.getElementById(id);
+function cost(base,count){return Math.min(LIMIT,Math.ceil(base*Math.pow(1.5,count)));}
+function clickValue(){return 1+2*state.small+4*state.large;}
+function load(){
+ try{
+  const raw=localStorage.getItem(SAVE_KEY); if(!raw)return;
+  const s=JSON.parse(raw);
+  if(!s || s.version!==1 || !['score','earned'].every(k=>Number.isFinite(s[k]) && s[k]>=0 && s[k]<=LIMIT) || !['small','large','auto'].every(k=>Number.isInteger(s[k])&&s[k]>=0&&s[k]<=10000) || !Array.isArray(s.achievements) || s.achievements.length!==3 || !s.achievements.every(v=>typeof v==='boolean')) throw new Error('Invalid save');
+  state=s;
+ }catch(e){el('saveStatus').textContent='Could not load saved progress. Starting a new game.';}
+}
+function save(){
+ try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));storageAvailable=true;dirty=false;el('saveStatus').textContent='Saved on this device. No offline earnings.';}
+ catch(e){storageAvailable=false;el('saveStatus').textContent='Saving unavailable. Progress will be lost when this page closes.';}
+}
+function achievements(){
+ const unlocked=[state.earned>=100,state.small+state.large+Math.max(0,state.auto-1)>=5,state.auto>=1];
+ for(let i=0;i<3;i++)state.achievements[i]=state.achievements[i]||unlocked[i];
+}
+function render(){
+ el('scoreValue').textContent=format(state.score);el('earnedValue').textContent=format(state.earned);el('clickValue').textContent=format(clickValue());
+ el('autoClickerStatus').textContent=state.auto ? `Auto-clicker: ${format(state.auto)} clicks/sec (${format(state.auto*clickValue())} cookies/sec)`:'Auto-clicker off';
+ const items=[['upgrade1','Stronger clicks',cost(10,state.small),'+2 cookies per click',false],['upgrade2','Big batch',cost(20,state.large),'+4 cookies per click',false],['buyAuto','Buy auto-clicker',50,'1 automatic click per second',state.auto>0],['upgradeAuto','Faster auto-clicker',cost(30,Math.max(0,state.auto-1)),'+1 automatic click per second',state.auto===0]];
+ for(const [id,label,price,detail,blocked] of items){const b=el(id);b.replaceChildren();const title=document.createElement('span');title.textContent=id==='buyAuto'&&state.auto?'Auto-clicker purchased':`${label} - ${format(price)} cookies`;const sub=document.createElement('small');sub.textContent=detail;b.append(title,sub);b.disabled=blocked||state.score<price;}
+ ['Bake 100 cookies total','Buy 5 upgrades','Own an auto-clicker'].forEach((name,i)=>{const a=el('achievement'+(i+1));a.textContent=(state.achievements[i]?'Unlocked: ':'Locked: ')+name;a.className='achievement'+(state.achievements[i]?' unlocked':'');});
+}
+function changed(){achievements();dirty=true;render();}
+function earn(amount){state.score=Math.min(LIMIT,state.score+amount);state.earned=Math.min(LIMIT,state.earned+amount);changed();}
+function buy(kind){
+ const price=kind==='small'?cost(10,state.small):kind==='large'?cost(20,state.large):kind==='auto'?50:cost(30,Math.max(0,state.auto-1));
+ if(state.score<price || kind==='auto'&&state.auto>0 || kind==='speed'&&state.auto===0)return;
+ state.score-=price; if(kind==='speed')state.auto++;else state[kind]++;
+ changed();save();
+}
+el('cookie').addEventListener('click',()=>earn(clickValue()));
+el('upgrade1').addEventListener('click',()=>buy('small'));el('upgrade2').addEventListener('click',()=>buy('large'));el('buyAuto').addEventListener('click',()=>buy('auto'));el('upgradeAuto').addEventListener('click',()=>buy('speed'));
+el('reset').addEventListener('click',()=>{if(confirm('Delete all cookies, upgrades and achievements on this device?')){state=defaults();changed();save();}});
+el('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else el('message').textContent='Fullscreen is not supported in this browser.';}catch(e){el('message').textContent='Fullscreen was blocked by this browser.';}});
+document.addEventListener('fullscreenchange',()=>el('fullscreen').textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen');
+load();achievements();render();save();
+let previous=performance.now();
+setInterval(()=>{const now=performance.now();const elapsed=Math.min(2,(now-previous)/1000);previous=now;if(!document.hidden && state.auto)earn(state.auto*clickValue()*elapsed);if(dirty)save();},1000);
+document.addEventListener('visibilitychange',()=>{previous=performance.now();if(document.hidden)save();});
+window.addEventListener('pagehide',save);
+</script>
+</body>
+</html>
